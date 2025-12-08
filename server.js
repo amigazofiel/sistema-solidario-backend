@@ -1,10 +1,8 @@
-import express from "express";
-import bodyParser from "body-parser";
-import cors from "cors";
-import mercadopago from "mercadopago";
-import pkg from "pg";
-
-const { Pool } = pkg;
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+const mercadopago = require("mercadopago");
+const { Pool } = require("pg");
 
 const app = express();
 app.use(cors());
