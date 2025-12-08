@@ -45,7 +45,7 @@ app.get("/pagar/:refId", async (req, res) => {
         pending: `https://ejemplo.com/pendiente`
       },
       auto_return: "approved",
-      notification_url: `https://TU-RAILWAY-URL/webhook`,
+      notification_url: `https://sistema-solidario-backend-production.up.railway.app/webhook`,
       external_reference: refId
     };
 
@@ -57,31 +57,25 @@ app.get("/pagar/:refId", async (req, res) => {
   }
 });
 
-// 🔹 Webhook para guardar en DB
+// 🔹 Webhook para guardar en DB (modo simulación)
 app.post("/webhook", async (req, res) => {
   const { type, data } = req.body;
 
   if (type === "payment" && data && data.id) {
     try {
-      const paymentId = data.id;
-      const payment = await mercadopago.payment.findById(paymentId);
+      // Simulación de datos falsos
+      const refId = data.id;
+      const payerId = "juan-001";
+      const nombre = "Juan";
+      const initPoint = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=TEST-ALIAS-001";
+      const alias = generarAlias(refId);
 
-      if (payment.body.status === "approved") {
-        const refId = payment.body.external_reference || "sin-ref";
-        const payerId = payment.body.payer.id || "sin-id";
-        const nombre = payment.body.payer.first_name || "sin-nombre";
-        const initPoint =
-          payment.body.transaction_details.external_resource_url || "sin-init";
-        const alias = generarAlias(refId);
+      await pool.query(
+        "INSERT INTO usuarios (payer_id, nombre, alias, init_point) VALUES ($1, $2, $3, $4)",
+        [payerId, nombre, alias, initPoint]
+      );
 
-        // Guardar en la tabla usuarios
-        await pool.query(
-          "INSERT INTO usuarios (payer_id, nombre, alias, init_point) VALUES ($1, $2, $3, $4)",
-          [payerId, nombre, alias, initPoint]
-        );
-
-        console.log("✅ Pago aprobado y guardado en DB. Alias:", alias);
-      }
+      console.log("✅ Simulación guardada en DB. Alias:", alias);
     } catch (error) {
       console.error("❌ Error procesando webhook:", error);
     }
@@ -90,7 +84,7 @@ app.post("/webhook", async (req, res) => {
   res.status(200).send("OK");
 });
 
-// 🔹 Endpoint para recuperar init_point por alias
+// 🔹 Consultar init_point por alias
 app.get("/pagar/alias/:alias", async (req, res) => {
   const { alias } = req.params;
   try {
