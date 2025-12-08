@@ -8,23 +8,19 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// 🔹 Configuración de MercadoPago
 mercadopago.configure({
   access_token: process.env.MP_ACCESS_TOKEN
 });
 
-// 🔹 Conexión a Postgres en Railway
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// 🔹 Función para generar alias único
 function generarAlias(refId) {
   return `alias-${refId}-${Date.now()}`;
 }
 
-// 🔹 Crear preferencia de pago
 app.get("/pagar/:refId", async (req, res) => {
   const refId = req.params.refId || "sin-ref";
 
@@ -55,13 +51,11 @@ app.get("/pagar/:refId", async (req, res) => {
   }
 });
 
-// 🔹 Webhook para guardar en DB (modo simulación)
 app.post("/webhook", async (req, res) => {
   const { type, data } = req.body;
 
   if (type === "payment" && data && data.id) {
     try {
-      // Simulación de datos falsos
       const refId = data.id;
       const payerId = "juan-001";
       const nombre = "Juan";
@@ -73,16 +67,15 @@ app.post("/webhook", async (req, res) => {
         [payerId, nombre, alias, initPoint]
       );
 
-      console.log("✅ Simulación guardada en DB. Alias:", alias);
+      console.log("Alias guardado:", alias);
     } catch (error) {
-      console.error("❌ Error procesando webhook:", error);
+      console.error("Error en webhook:", error);
     }
   }
 
   res.status(200).send("OK");
 });
 
-// 🔹 Consultar init_point por alias
 app.get("/pagar/alias/:alias", async (req, res) => {
   const { alias } = req.params;
   try {
@@ -97,18 +90,16 @@ app.get("/pagar/alias/:alias", async (req, res) => {
       res.json({ error: "Alias no encontrado" });
     }
   } catch (error) {
-    console.error("❌ Error consultando alias:", error);
+    console.error("Error consultando alias:", error);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
-// 🔹 Endpoint raíz
 app.get("/", (req, res) => {
   res.send("Backend Sistema Solidario activo.");
 });
 
-// 🔹 Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor escuchando en puerto ${PORT}`);
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
