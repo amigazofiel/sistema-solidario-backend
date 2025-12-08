@@ -104,4 +104,6 @@ app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
 // Despliegue inicial limpio
+console.log("Despliegue forzado desde entorno limpio");
+
 
