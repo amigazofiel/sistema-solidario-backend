@@ -1,6 +1,10 @@
 {
   "build": {
-    "builder": "NIXPACKS"
+    "env": {
+      "NODE_ENV": "production"
+    }
   },
-  "start": "node server.js"
+  "start": {
+    "cmd": "node server.js"
+  }
 }
