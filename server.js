@@ -2,16 +2,16 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const { MercadoPagoConfig, Preference } = require("mercadopago");
+const mercadopago = require("mercadopago");
 const { Pool } = require("pg");
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Configuración de MercadoPago (nuevo SDK v2.11.0)
-const mpClient = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN"
+// Configuración de MercadoPago (SDK clásico)
+mercadopago.configure({
+  access_token: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN"
 });
 
 // Configuración de PostgreSQL
@@ -48,10 +48,8 @@ app.get("/pagar/:refId", async (req, res) => {
       external_reference: refId
     };
 
-    const preferenceClient = new Preference(mpClient);
-    const response = await preferenceClient.create({ body: preference });
-
-    return res.json({ init_point: response.init_point });
+    const response = await mercadopago.preferences.create(preference);
+    return res.json({ init_point: response.body.init_point });
   } catch (err) {
     console.error("Error creando preferencia:", err);
     return res.status(500).json({ error: "No se pudo crear la preferencia" });
