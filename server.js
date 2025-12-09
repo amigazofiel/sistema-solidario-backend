@@ -8,19 +8,23 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// Configuración de MercadoPago
 mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN
+  access_token: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN"
 });
 
+// Configuración de PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
 });
 
+// Generar alias único
 function generarAlias(refId) {
   return `alias-${refId}-${Date.now()}`;
 }
 
+// Endpoint de pago
 app.get("/pagar/:refId", async (req, res) => {
   const refId = req.params.refId || "sin-ref";
 
@@ -34,12 +38,12 @@ app.get("/pagar/:refId", async (req, res) => {
         }
       ],
       back_urls: {
-        success: `https://ejemplo.com/gracias?ref=${encodeURIComponent(refId)}`,
-        failure: `https://ejemplo.com/error`,
-        pending: `https://ejemplo.com/pendiente`
+        success: `https://tu-dominio.com/gracias?ref=${encodeURIComponent(refId)}`,
+        failure: `https://tu-dominio.com/error`,
+        pending: `https://tu-dominio.com/pendiente`
       },
       auto_return: "approved",
-      notification_url: `https://sistema-solidario-backend-production.up.railway.app/webhook`,
+      notification_url: `${process.env.BASE_URL}/webhook`,
       external_reference: refId
     };
 
@@ -51,20 +55,18 @@ app.get("/pagar/:refId", async (req, res) => {
   }
 });
 
+// Webhook de MercadoPago
 app.post("/webhook", async (req, res) => {
   const { type, data } = req.body;
 
   if (type === "payment" && data && data.id) {
     try {
       const refId = data.id;
-      const payerId = "juan-001";
-      const nombre = "Juan";
-      const initPoint = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=TEST-ALIAS-001";
       const alias = generarAlias(refId);
 
       await pool.query(
         "INSERT INTO usuarios (payer_id, nombre, alias, init_point) VALUES ($1, $2, $3, $4)",
-        [payerId, nombre, alias, initPoint]
+        ["juan-001", "Juan", alias, "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=TEST-ALIAS-001"]
       );
 
       console.log("Alias guardado:", alias);
@@ -76,6 +78,7 @@ app.post("/webhook", async (req, res) => {
   res.status(200).send("OK");
 });
 
+// Consultar alias
 app.get("/pagar/alias/:alias", async (req, res) => {
   const { alias } = req.params;
   try {
@@ -95,15 +98,13 @@ app.get("/pagar/alias/:alias", async (req, res) => {
   }
 });
 
+// Endpoint raíz
 app.get("/", (req, res) => {
   res.send("Backend Sistema Solidario activo.");
 });
 
+// Puerto dinámico para Vercel
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
-// Despliegue inicial limpio
-console.log("Despliegue forzado desde entorno limpio");
-
-
