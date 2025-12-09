@@ -48,7 +48,6 @@ app.get("/pagar/:refId", async (req, res) => {
       external_reference: refId
     };
 
-    // Crear preferencia con nuevo cliente
     const preferenceClient = new Preference(mpClient);
     const response = await preferenceClient.create({ body: preference });
 
@@ -107,8 +106,5 @@ app.get("/", (req, res) => {
   res.send("Backend Sistema Solidario activo.");
 });
 
-// Puerto dinámico para Vercel
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en puerto ${PORT}`);
-});
+// 🚀 Exportar la app para Vercel (no usar app.listen)
+module.exports = app;
