@@ -1,16 +1,19 @@
 {
   "name": "sistema-solidario-backend",
   "version": "1.0.0",
+  "description": "Backend del sistema solidario",
   "main": "server.js",
-  "license": "MIT",
   "scripts": {
     "start": "node server.js"
   },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "express": "^4.22.1",
-    "mercadopago": "*",
+    "mercadopago": "^1.5.6",
     "pg": "^8.11.3"
   }
 }
