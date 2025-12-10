@@ -1,29 +1,39 @@
-// Ajuste final para despliegue en Vercel
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const mercadopago = require("mercadopago");
 const { Pool } = require("pg");
+const nodemailer = require("nodemailer");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Configuración de MercadoPago
+// MercadoPago
 mercadopago.configure({
   access_token: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN"
 });
 
-// Configuración de PostgreSQL
+// PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
 });
 
-// Generar alias único
-function generarAlias(refId) {
-  return `alias-${refId}-${Date.now()}`;
+// Alias único
+function generarAlias() {
+  return `alias-${uuidv4().slice(0, 8)}`;
 }
+
+// Nodemailer
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 // Endpoint de pago único
 app.get("/pagar/:refId", async (req, res) => {
@@ -31,13 +41,7 @@ app.get("/pagar/:refId", async (req, res) => {
 
   try {
     const preference = {
-      items: [
-        {
-          title: "Sistema Solidario",
-          unit_price: 2500,
-          quantity: 1
-        }
-      ],
+      items: [{ title: "Sistema Solidario", unit_price: 2500, quantity: 1 }],
       back_urls: {
         success: `https://tu-dominio.com/gracias?ref=${encodeURIComponent(refId)}`,
         failure: `https://tu-dominio.com/error`,
@@ -49,27 +53,21 @@ app.get("/pagar/:refId", async (req, res) => {
     };
 
     const response = await mercadopago.preferences.create(preference);
-    return res.json({ init_point: response.body.init_point });
+    res.json({ init_point: response.body.init_point });
   } catch (err) {
     console.error("Error creando preferencia:", err);
-    return res.status(500).json({ error: "No se pudo crear la preferencia" });
+    res.status(500).json({ error: "No se pudo crear la preferencia" });
   }
 });
 
-// ✅ Nuevo endpoint de suscripción mensual con reparto automático
+// Suscripción mensual con reparto
 app.post("/suscripcion/:alias", async (req, res) => {
   const { alias } = req.params;
-  const { usuario_id, email } = req.body;
+  const { usuario_id, email, patrocinador_id } = req.body;
 
   try {
     const preference = {
-      items: [
-        {
-          title: "Suscripción Sistema Solidario",
-          unit_price: 15000,
-          quantity: 1
-        }
-      ],
+      items: [{ title: "Suscripción Sistema Solidario", unit_price: 15000, quantity: 1 }],
       external_reference: `${usuario_id}-${alias}`,
       marketplace_fee: 5000,
       payer: { email },
@@ -83,10 +81,30 @@ app.post("/suscripcion/:alias", async (req, res) => {
     };
 
     const response = await mercadopago.preferences.create(preference);
-    return res.json({ init_point: response.body.init_point });
+
+    const nuevoAlias = generarAlias();
+    const result = await pool.query(
+      "INSERT INTO usuarios (usuario_id, email, alias, patrocinador_id, init_point) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [usuario_id, email, nuevoAlias, patrocinador_id || null, response.body.init_point]
+    );
+
+    const enlaceAfiliado = `https://sistema-solidario.com/pagar/alias/${nuevoAlias}`;
+    const mailOptions = {
+      from: "Sistema Solidario <no-reply@sistema-solidario.com>",
+      to: email,
+      subject: "Tu enlace de afiliado - Sistema Solidario",
+      text: `¡Bienvenido! Este es tu enlace único para invitar personas:\n\n${enlaceAfiliado}\n\nCada persona que se suscriba con tu enlace te generará ingresos recurrentes.`,
+    };
+    await transporter.sendMail(mailOptions);
+
+    res.json({
+      init_point: response.body.init_point,
+      enlaceAfiliado,
+      usuario: result.rows[0]
+    });
   } catch (error) {
     console.error("Error creando suscripción:", error);
-    return res.status(500).json({ error: "No se pudo crear la suscripción" });
+    res.status(500).json({ error: "No se pudo crear la suscripción" });
   }
 });
 
@@ -97,14 +115,14 @@ app.post("/webhook", async (req, res) => {
   if (type === "payment" && data && data.id) {
     try {
       const refId = data.id;
-      const alias = generarAlias(refId);
+      const alias = generarAlias();
 
       await pool.query(
-        "INSERT INTO usuarios (payer_id, nombre, alias, init_point) VALUES ($1, $2, $3, $4)",
-        ["juan-001", "Juan", alias, "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=TEST-ALIAS-001"]
+        "INSERT INTO pagos (payment_id, alias) VALUES ($1, $2)",
+        [refId, alias]
       );
 
-      console.log("Alias guardado:", alias);
+      console.log("Pago registrado con alias:", alias);
     } catch (error) {
       console.error("Error en webhook:", error);
     }
@@ -138,5 +156,5 @@ app.get("/", (req, res) => {
   res.send("Backend Sistema Solidario activo.");
 });
 
-// 🚀 Exportar la app para Vercel
+// Exportar para Vercel
 module.exports = app;
