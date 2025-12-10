@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Configuración de MercadoPago (SDK clásico)
+// Configuración de MercadoPago
 mercadopago.configure({
   access_token: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN"
 });
@@ -25,7 +25,7 @@ function generarAlias(refId) {
   return `alias-${refId}-${Date.now()}`;
 }
 
-// Endpoint de pago
+// Endpoint de pago único
 app.get("/pagar/:refId", async (req, res) => {
   const refId = req.params.refId || "sin-ref";
 
@@ -53,6 +53,40 @@ app.get("/pagar/:refId", async (req, res) => {
   } catch (err) {
     console.error("Error creando preferencia:", err);
     return res.status(500).json({ error: "No se pudo crear la preferencia" });
+  }
+});
+
+// ✅ Nuevo endpoint de suscripción mensual con reparto automático
+app.post("/suscripcion/:alias", async (req, res) => {
+  const { alias } = req.params;
+  const { usuario_id, email } = req.body;
+
+  try {
+    const preference = {
+      items: [
+        {
+          title: "Suscripción Sistema Solidario",
+          unit_price: 15000,
+          quantity: 1
+        }
+      ],
+      external_reference: `${usuario_id}-${alias}`,
+      marketplace_fee: 5000,
+      payer: { email },
+      back_urls: {
+        success: "https://sistema-solidario.com/success",
+        failure: "https://sistema-solidario.com/failure",
+        pending: "https://sistema-solidario.com/pending"
+      },
+      auto_return: "approved",
+      notification_url: `${process.env.BASE_URL}/webhook`
+    };
+
+    const response = await mercadopago.preferences.create(preference);
+    return res.json({ init_point: response.body.init_point });
+  } catch (error) {
+    console.error("Error creando suscripción:", error);
+    return res.status(500).json({ error: "No se pudo crear la suscripción" });
   }
 });
 
@@ -104,5 +138,5 @@ app.get("/", (req, res) => {
   res.send("Backend Sistema Solidario activo.");
 });
 
-// 🚀 Exportar la app para Vercel (no usar app.listen)
+// 🚀 Exportar la app para Vercel
 module.exports = app;
