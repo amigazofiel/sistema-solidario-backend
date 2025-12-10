@@ -1,7 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const mercadopago = require("mercadopago");
+const { MercadoPagoConfig, Preference } = require("mercadopago");
 const { Pool } = require("pg");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
@@ -11,9 +11,10 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // MercadoPago
-mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN"
+const mpClient = new MercadoPagoConfig({
+  accessToken: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN"
 });
+const preferenceClient = new Preference(mpClient);
 
 // PostgreSQL
 const pool = new Pool({
@@ -52,8 +53,8 @@ app.get("/pagar/:refId", async (req, res) => {
       external_reference: refId
     };
 
-    const response = await mercadopago.preferences.create(preference);
-    res.json({ init_point: response.body.init_point });
+    const response = await preferenceClient.create({ body: preference });
+    res.json({ init_point: response.id });
   } catch (err) {
     console.error("Error creando preferencia:", err);
     res.status(500).json({ error: "No se pudo crear la preferencia" });
@@ -80,12 +81,12 @@ app.post("/suscripcion/:alias", async (req, res) => {
       notification_url: `${process.env.BASE_URL}/webhook`
     };
 
-    const response = await mercadopago.preferences.create(preference);
+    const response = await preferenceClient.create({ body: preference });
 
     const nuevoAlias = generarAlias();
     const result = await pool.query(
       "INSERT INTO usuarios (usuario_id, email, alias, patrocinador_id, init_point) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [usuario_id, email, nuevoAlias, patrocinador_id || null, response.body.init_point]
+      [usuario_id, email, nuevoAlias, patrocinador_id || null, response.id]
     );
 
     const enlaceAfiliado = `https://sistema-solidario.com/pagar/alias/${nuevoAlias}`;
@@ -98,7 +99,7 @@ app.post("/suscripcion/:alias", async (req, res) => {
     await transporter.sendMail(mailOptions);
 
     res.json({
-      init_point: response.body.init_point,
+      init_point: response.id,
       enlaceAfiliado,
       usuario: result.rows[0]
     });
