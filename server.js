@@ -159,3 +159,4 @@ app.get("/", (req, res) => {
 
 // Exportar para Vercel
 module.exports = app;
+// Redeploy trigger - Juan Ayala father
